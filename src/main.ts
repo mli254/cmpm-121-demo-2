@@ -87,3 +87,40 @@ function redraw() {
     }
   }
 }
+
+// setting up clear, undo, and redo buttons
+app.append(document.createElement("br"));
+
+const clearButton = document.createElement("button");
+clearButton.innerHTML = "clear";
+app.append(clearButton);
+
+clearButton.addEventListener("click", () => {
+  lines.splice(start, lines.length);
+  // removes all lines, thus indicating to the Observer/redraw() that no lines should be drawn
+  canvas.dispatchEvent(drawingChanged);
+});
+
+const undoButton = document.createElement("button");
+undoButton.innerHTML = "undo";
+app.append(undoButton);
+
+undoButton.addEventListener("click", () => {
+  if (lines.length) {
+    // removes a line from the array of lines to draw when redraw() is called, and pushes it to
+    // the array that stores lines to redo
+    redoLines.push(lines.pop()!);
+    canvas.dispatchEvent(drawingChanged);
+  }
+});
+
+const redoButton = document.createElement("button");
+redoButton.innerHTML = "redo";
+app.append(redoButton);
+
+redoButton.addEventListener("click", () => {
+  if (redoLines.length) {
+    lines.push(redoLines.pop()!);
+    canvas.dispatchEvent(drawingChanged);
+  }
+});
