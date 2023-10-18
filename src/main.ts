@@ -14,6 +14,7 @@ app.append(header);
 const canvas = document.createElement("canvas");
 canvas.width = 256;
 canvas.height = 256;
+canvas.style.cursor = "none";
 app.append(canvas);
 
 // creating classes
@@ -49,6 +50,28 @@ class LineCommand {
   }
 }
 
+class CursorCommand {
+  x: number;
+  y: number;
+  thickness: number;
+  constructor(x: number, y: number, thickness: number) {
+    this.x = x;
+    this.y = y;
+    this.thickness = thickness;
+  }
+  display(context: CanvasRenderingContext2D) {
+    const magnitude = 8;
+    const xOffset = 4;
+    const yOffset = 2;
+    context.font = `${this.thickness * magnitude}px monospace`;
+    context.fillText(
+      "*",
+      this.x - (this.thickness * magnitude) / xOffset,
+      this.y + (this.thickness * magnitude) / yOffset
+    );
+  }
+}
+
 // variables
 const start = 0;
 const thin = 2;
@@ -64,6 +87,9 @@ let currentMarker = thinMarker;
 const commands: LineCommand[] = [];
 const redoCommands: LineCommand[] = [];
 
+// stores cursor command
+let cursorCommand: CursorCommand | null = null;
+
 // observes and dispatches events when notified
 const bus = new EventTarget();
 
@@ -77,22 +103,50 @@ function redraw() {
   ctx.clearRect(start, start, canvas.width, canvas.height);
 
   commands.forEach((cmd) => cmd.display(currentMarker.context));
+
+  if (cursorCommand) {
+    cursorCommand.display(currentMarker.context);
+  }
 }
 
 bus.addEventListener("drawing-changed", redraw);
+bus.addEventListener("tool-moved", redraw);
 
 let currentLineCommand: LineCommand | null = null;
 
 // mouse events
+canvas.addEventListener("mouseout", () => {
+  cursorCommand = null;
+  notify("tool-moved");
+});
+
+canvas.addEventListener("mouseenter", (e) => {
+  cursorCommand = new CursorCommand(
+    e.offsetX,
+    e.offsetY,
+    currentMarker.lineWidth
+  );
+  notify("tool-moved");
+});
+
 canvas.addEventListener("mousemove", (e) => {
   const leftButton = 1;
+  cursorCommand = new CursorCommand(
+    e.offsetX,
+    e.offsetY,
+    currentMarker.lineWidth
+  );
+  notify("tool-moved");
+
   if (e.buttons == leftButton) {
+    cursorCommand = null;
     currentLineCommand!.points.push({ x: e.offsetX, y: e.offsetY });
     notify("drawing-changed");
   }
 });
 
 canvas.addEventListener("mousedown", (e) => {
+  cursorCommand = null;
   currentLineCommand = new LineCommand(
     e.offsetX,
     e.offsetY,
