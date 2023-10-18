@@ -19,19 +19,23 @@ app.append(canvas);
 // creating classes
 class Marker {
   context: CanvasRenderingContext2D;
-  constructor(context: CanvasRenderingContext2D) {
+  lineWidth: number;
+  constructor(context: CanvasRenderingContext2D, lineWidth: number) {
     this.context = context;
     this.context.strokeStyle = "black";
-    this.context.lineWidth = 2;
+    this.lineWidth = lineWidth;
   }
 }
 
 class LineCommand {
   points: { x: number; y: number }[];
-  constructor(x: number, y: number) {
+  thickness: number;
+  constructor(x: number, y: number, thickness: number) {
     this.points = [{ x, y }];
+    this.thickness = thickness;
   }
   display(context: CanvasRenderingContext2D) {
+    context.lineWidth = this.thickness;
     context.beginPath();
     const { x, y } = this.points[start];
     context.moveTo(x, y);
@@ -47,10 +51,14 @@ class LineCommand {
 
 // variables
 const start = 0;
+const thin = 2;
+const thick = 4;
 
 // getting canvas context
 const ctx = canvas.getContext("2d")!;
-const marker = new Marker(ctx);
+const thinMarker = new Marker(ctx, thin);
+const thickMarker = new Marker(ctx, thick);
+let currentMarker = thinMarker;
 
 // display list
 const commands: LineCommand[] = [];
@@ -68,7 +76,7 @@ function notify(name: string) {
 function redraw() {
   ctx.clearRect(start, start, canvas.width, canvas.height);
 
-  commands.forEach((cmd) => cmd.display(marker.context));
+  commands.forEach((cmd) => cmd.display(currentMarker.context));
 }
 
 bus.addEventListener("drawing-changed", redraw);
@@ -85,7 +93,11 @@ canvas.addEventListener("mousemove", (e) => {
 });
 
 canvas.addEventListener("mousedown", (e) => {
-  currentLineCommand = new LineCommand(e.offsetX, e.offsetY);
+  currentLineCommand = new LineCommand(
+    e.offsetX,
+    e.offsetY,
+    currentMarker.lineWidth
+  );
   commands.push(currentLineCommand);
   redoCommands.splice(start, redoCommands.length);
   notify("drawing-changed");
@@ -94,6 +106,28 @@ canvas.addEventListener("mousedown", (e) => {
 canvas.addEventListener("mouseup", () => {
   currentLineCommand = null;
   notify("drawing-changed");
+});
+
+// creating thick/thin buttons
+app.append(document.createElement("br"));
+const thickButton = document.createElement("button");
+thickButton.innerHTML = "thick";
+app.append(thickButton);
+
+thickButton.addEventListener("click", () => {
+  currentMarker = thickMarker;
+  thickButton?.classList.add("selectedTool");
+  thinButton?.classList.remove("selectedTool");
+});
+
+const thinButton = document.createElement("button");
+thinButton.innerHTML = "thin";
+app.append(thinButton);
+
+thinButton.addEventListener("click", () => {
+  currentMarker = thinMarker;
+  thinButton?.classList.add("selectedTool");
+  thickButton?.classList.remove("selectedTool");
 });
 
 // creating buttons
