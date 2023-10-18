@@ -1,6 +1,6 @@
 import "./style.css";
 
-// Setting up app elements
+// setting up app elements
 const app: HTMLDivElement = document.querySelector("#app")!;
 
 const gameName = "Sticky Sketch";
@@ -16,79 +16,87 @@ canvas.width = 256;
 canvas.height = 256;
 app.append(canvas);
 
-// getting canvas context
-const ctx = canvas.getContext("2d")!;
-
-// arrays of points
-const lines: { x: number; y: number }[][] = [];
-const redoLines: { x: number; y: number }[][] = [];
-
-let currentLine: { x: number; y: number }[] | null = null;
-
-// new event
-const drawingChanged = new Event("drawing-changed", {});
-
-// drawing on the canvas using mouse input
-const start = 0;
-const offset = 1;
-
-const cursor = { active: false, x: 0, y: 0 };
-
-canvas.addEventListener("mousedown", (event) => {
-  cursor.active = true;
-  cursor.x = event.offsetX;
-  cursor.y = event.offsetY;
-
-  currentLine = [];
-  lines.push(currentLine); // Question: why push an empty array?
-  redoLines.splice(start, redoLines.length); // empties the redoLines array
-  currentLine.push({ x: cursor.x, y: cursor.y }); // Question: why don't we push to the lines array again?
-
-  // alert the observer
-  canvas.dispatchEvent(drawingChanged);
-});
-
-canvas.addEventListener("mousemove", (event) => {
-  if (cursor.active) {
-    cursor.x = event.offsetX;
-    cursor.y = event.offsetY;
-
-    // stores each new point, and dispatches the "drawing-changed" event
-    currentLine!.push({ x: cursor.x, y: cursor.y });
-
-    canvas.dispatchEvent(drawingChanged);
-  }
-});
-
-canvas.addEventListener("mouseup", () => {
-  cursor.active = false;
-
-  currentLine = null;
-  canvas.dispatchEvent(drawingChanged);
-});
-
-// new Observer for the "drawing-changed" event that calls redraw when needed
-canvas.addEventListener("drawing-changed", () => {
-  redraw();
-});
-
-// redraws the entire canvas
-function redraw() {
-  ctx.clearRect(start, start, canvas.width, canvas.height);
-  for (const line of lines) {
-    if (line.length > offset) {
-      ctx.beginPath();
-      const { x, y } = line[start];
-      ctx.moveTo(x, y);
-      for (const { x, y } of line) {
-        ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    }
+// creating classes
+class Marker {
+  context: CanvasRenderingContext2D;
+  constructor(context: CanvasRenderingContext2D) {
+    this.context = context;
+    this.context.strokeStyle = "black";
+    this.context.lineWidth = 2;
   }
 }
 
-// setting up clear, undo, and redo buttons
+class LineCommand {
+  points: { x: number; y: number }[];
+  constructor(x: number, y: number) {
+    this.points = [{ x, y }];
+  }
+  display(context: CanvasRenderingContext2D) {
+    context.beginPath();
+    const { x, y } = this.points[start];
+    context.moveTo(x, y);
+    for (const { x, y } of this.points) {
+      context.lineTo(x, y);
+    }
+    context.stroke();
+  }
+  drag(x: number, y: number) {
+    this.points.push({ x, y });
+  }
+}
+
+// variables
+const start = 0;
+
+// getting canvas context
+const ctx = canvas.getContext("2d")!;
+const marker = new Marker(ctx);
+
+// display list
+const commands: LineCommand[] = [];
+const redoCommands: LineCommand[] = [];
+
+// observes and dispatches events when notified
+const bus = new EventTarget();
+
+// dispatches events
+function notify(name: string) {
+  bus.dispatchEvent(new Event(name));
+}
+
+// redraws the screen when drawing is changed
+function redraw() {
+  ctx.clearRect(start, start, canvas.width, canvas.height);
+
+  commands.forEach((cmd) => cmd.display(marker.context));
+}
+
+bus.addEventListener("drawing-changed", redraw);
+
+let currentLineCommand: LineCommand | null = null;
+
+// mouse events
+canvas.addEventListener("mousemove", (e) => {
+  const leftButton = 1;
+  if (e.buttons == leftButton) {
+    currentLineCommand!.points.push({ x: e.offsetX, y: e.offsetY });
+    notify("drawing-changed");
+  }
+});
+
+canvas.addEventListener("mousedown", (e) => {
+  currentLineCommand = new LineCommand(e.offsetX, e.offsetY);
+  commands.push(currentLineCommand);
+  redoCommands.splice(start, redoCommands.length);
+  notify("drawing-changed");
+});
+
+canvas.addEventListener("mouseup", () => {
+  currentLineCommand = null;
+  notify("drawing-changed");
+});
+
+// creating buttons
 app.append(document.createElement("br"));
 
 const clearButton = document.createElement("button");
@@ -96,9 +104,8 @@ clearButton.innerHTML = "clear";
 app.append(clearButton);
 
 clearButton.addEventListener("click", () => {
-  lines.splice(start, lines.length);
-  // removes all lines, thus indicating to the Observer/redraw() that no lines should be drawn
-  canvas.dispatchEvent(drawingChanged);
+  commands.splice(start, commands.length); // empty out all previously stored line commands
+  notify("drawing-changed");
 });
 
 const undoButton = document.createElement("button");
@@ -106,11 +113,9 @@ undoButton.innerHTML = "undo";
 app.append(undoButton);
 
 undoButton.addEventListener("click", () => {
-  if (lines.length) {
-    // removes a line from the array of lines to draw when redraw() is called, and pushes it to
-    // the array that stores lines to redo
-    redoLines.push(lines.pop()!);
-    canvas.dispatchEvent(drawingChanged);
+  if (commands.length) {
+    redoCommands.push(commands.pop()!);
+    notify("drawing-changed");
   }
 });
 
@@ -119,8 +124,8 @@ redoButton.innerHTML = "redo";
 app.append(redoButton);
 
 redoButton.addEventListener("click", () => {
-  if (redoLines.length) {
-    lines.push(redoLines.pop()!);
-    canvas.dispatchEvent(drawingChanged);
+  if (redoCommands.length) {
+    commands.push(redoCommands.pop()!);
+    notify("drawing-changed");
   }
 });
