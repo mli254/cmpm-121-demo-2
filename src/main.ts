@@ -141,7 +141,7 @@ class StickerPreviewCommand {
 const start = 0;
 const stickerSize = 4;
 const thin = 2;
-const thick = 4;
+const thick = 6;
 
 // getting canvas context
 const ctx = canvas.getContext("2d")!;
