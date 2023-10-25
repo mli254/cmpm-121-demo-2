@@ -10,6 +10,12 @@ const header = document.createElement("h1");
 header.innerHTML = gameName;
 app.append(header);
 
+const exportButton = document.createElement("button");
+exportButton.innerHTML = "export";
+app.append(exportButton);
+
+app.append(document.createElement("br"));
+
 // creating canvas
 const canvas = document.createElement("canvas");
 canvas.width = 256;
@@ -339,4 +345,26 @@ thinMarker.button.addEventListener("click", () => {
 
 stickerButtons.forEach(function (sticker: Sticker) {
   addStickerButton(sticker);
+});
+
+// adding functionality to the exportButton; further down to be able to reference the cmds
+exportButton.addEventListener("click", () => {
+  const exportCanvas = document.createElement("canvas");
+  exportCanvas.width = 1024;
+  exportCanvas.height = 1024;
+  exportCanvas.style.cursor = "none";
+
+  const scaleX = 4;
+  const scaleY = 4;
+  const exportCtx = exportCanvas.getContext("2d")!;
+  exportCtx.scale(scaleX, scaleY);
+  exportCtx.clearRect(start, start, exportCanvas.width, exportCanvas.height);
+  exportCtx.fillStyle = "white";
+  exportCtx.fillRect(start, start, exportCanvas.width, exportCanvas.height);
+  commands.forEach((cmd) => cmd.display(exportCtx));
+
+  const anchor = document.createElement("a");
+  anchor.href = exportCanvas.toDataURL("image/png");
+  anchor.download = "sketchpad.png";
+  anchor.click();
 });
