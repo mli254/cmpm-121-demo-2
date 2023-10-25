@@ -55,12 +55,24 @@ class Sticker extends Tool {
 class LineCommand {
   points: { x: number; y: number }[];
   marker: Marker;
-  constructor(x: number, y: number, marker: Marker) {
+  color: string | CanvasGradient | CanvasPattern;
+  constructor(
+    x: number,
+    y: number,
+    marker: Marker,
+    color: string | CanvasGradient | CanvasPattern
+  ) {
+    if (color == null) {
+      this.color = "black";
+    } else {
+      this.color = color;
+    }
     this.points = [{ x, y }];
     this.marker = marker;
   }
   display(context: CanvasRenderingContext2D) {
     context.lineWidth = this.marker.lineWidth;
+    context.strokeStyle = this.color!;
     context.beginPath();
     const { x, y } = this.points[start];
     context.moveTo(x, y);
@@ -78,16 +90,19 @@ class LinePreviewCommand {
   x: number;
   y: number;
   marker: Marker;
-  constructor(x: number, y: number, marker: Marker) {
+  color: string;
+  constructor(x: number, y: number, marker: Marker, color: string) {
     this.x = x;
     this.y = y;
     this.marker = marker;
+    this.color = color;
   }
   display(context: CanvasRenderingContext2D) {
     const magnitude = 8;
     const xOffset = 4;
     const yOffset = 2;
     context.font = `${this.marker.lineWidth * magnitude}px monospace`;
+    context.fillStyle = this.color;
     context.fillText(
       "*",
       this.x - (this.marker.lineWidth * magnitude) / xOffset,
@@ -137,6 +152,38 @@ class StickerPreviewCommand {
   }
 }
 
+interface Color {
+  hex: string;
+  button: HTMLButtonElement;
+}
+
+const colorOptions = [
+  {
+    hex: "black",
+    button: document.createElement("button"),
+  },
+  {
+    hex: "#900C3F",
+    button: document.createElement("button"),
+  },
+  {
+    hex: "#C70039",
+    button: document.createElement("button"),
+  },
+  {
+    hex: "#FF5733",
+    button: document.createElement("button"),
+  },
+  {
+    hex: "#FFC300",
+    button: document.createElement("button"),
+  },
+  {
+    hex: "#DAF7A6",
+    button: document.createElement("button"),
+  },
+];
+
 // variables
 const start = 0;
 const stickerSize = 4;
@@ -149,6 +196,7 @@ const thinMarker = new Marker(ctx, thin);
 const thickMarker = new Marker(ctx, thick);
 let currentMarker: Marker | null = thinMarker; // by default, thin marker is selected
 let currentSticker: Sticker | null = null; // only one tool active at a time
+let currentColor = "black";
 currentMarker?.button.classList.add("selectedTool"); // show that the thin marker is selected
 
 // display list
@@ -200,8 +248,24 @@ function addStickerButton(sticker: Sticker) {
   sticker.button.addEventListener("click", () => {
     currentSticker = sticker;
     currentMarker = null;
+    randomColor();
     notify("tool-changed");
   });
+}
+
+function addColorButton(color: Color) {
+  color.button.style.backgroundColor = color.hex;
+  app.append(color.button);
+
+  color.button.addEventListener("click", () => {
+    currentColor = color.hex;
+  });
+}
+
+function randomColor() {
+  const randColor =
+    colorOptions[Math.floor(Math.random() * colorOptions.length)];
+  currentColor = randColor.hex;
 }
 
 bus.addEventListener("drawing-changed", redraw);
@@ -218,7 +282,12 @@ canvas.addEventListener("mouseout", () => {
 
 canvas.addEventListener("mouseenter", (e) => {
   if (currentMarker) {
-    cursorCommand = new LinePreviewCommand(e.offsetX, e.offsetY, currentMarker);
+    cursorCommand = new LinePreviewCommand(
+      e.offsetX,
+      e.offsetY,
+      currentMarker,
+      currentColor
+    );
     notify("tool-moved");
   } else if (currentSticker) {
     cursorCommand = new StickerPreviewCommand(
@@ -233,7 +302,12 @@ canvas.addEventListener("mouseenter", (e) => {
 canvas.addEventListener("mousemove", (e) => {
   const leftButton = 1;
   if (currentMarker) {
-    cursorCommand = new LinePreviewCommand(e.offsetX, e.offsetY, currentMarker);
+    cursorCommand = new LinePreviewCommand(
+      e.offsetX,
+      e.offsetY,
+      currentMarker,
+      currentColor
+    );
   } else if (currentSticker) {
     cursorCommand = new StickerPreviewCommand(
       e.offsetX,
@@ -257,7 +331,12 @@ canvas.addEventListener("mousemove", (e) => {
 canvas.addEventListener("mousedown", (e) => {
   cursorCommand = null;
   if (currentMarker) {
-    currentLineCommand = new LineCommand(e.offsetX, e.offsetY, currentMarker);
+    currentLineCommand = new LineCommand(
+      e.offsetX,
+      e.offsetY,
+      currentMarker,
+      currentColor
+    );
     commands.push(currentLineCommand);
   }
   if (currentSticker) {
@@ -319,8 +398,15 @@ app.append(newSticker);
 newSticker.addEventListener("click", () => {
   const offset = 1;
   const addSticker = prompt("Please choose an emoji:", "🍄");
-  stickerButtons.push(new Sticker(ctx, stickerSize, addSticker!));
-  addStickerButton(stickerButtons[stickerButtons.length - offset]);
+  if (addSticker) {
+    stickerButtons.push(new Sticker(ctx, stickerSize, addSticker));
+    addStickerButton(stickerButtons[stickerButtons.length - offset]);
+  }
+});
+
+app.append(document.createElement("br"));
+colorOptions.forEach(function (color: Color) {
+  addColorButton(color);
 });
 
 app.append(document.createElement("br"));
@@ -331,6 +417,7 @@ app.append(thickMarker.button);
 thickMarker.button.addEventListener("click", () => {
   currentMarker = thickMarker;
   currentSticker = null;
+  randomColor();
   notify("tool-changed");
 });
 
@@ -340,6 +427,7 @@ app.append(thinMarker.button);
 thinMarker.button.addEventListener("click", () => {
   currentMarker = thinMarker;
   currentSticker = null;
+  randomColor();
   notify("tool-changed");
 });
 
