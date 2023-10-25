@@ -73,7 +73,8 @@ button:focus-visible {
 }
 
 .selectedTool {
-  background-color: rgb(71, 88, 76);
+  background-color: rgb(33, 139, 65);
+  color: white;
 }
 
 
